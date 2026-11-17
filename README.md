@@ -1,53 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+﻿# Notas en Markdown con versiones
 
-## Getting Started
+Editor de notas Markdown con vista previa, etiquetas, búsqueda e historial de versiones.
 
-First, run the development server:
+## Requisitos
+
+- Node.js 20+
+- Proyecto Firebase con Firestore habilitado
+- Credenciales de cuenta de servicio (solo servidor)
+
+## Configuración
+
+1. Instala dependencias:
+
+```bash
+npm install
+```
+
+2. Crea `.env.local` en la raíz del proyecto (no se debe versionar):
+
+```env
+FIREBASE_PROJECT_ID=tu-project-id
+FIREBASE_CLIENT_EMAIL=tu-service-account@tu-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+- La app usa **Firebase Admin SDK** desde rutas API del servidor (`app/api/**`) y **Firestore** como fuente de verdad (reemplaza `localStorage`).
+- Nunca expongas la clave privada en el cliente ni en el repositorio. Si una clave fue comprometida, **rotarla/revocarla** en Google Cloud/Firebase IAM.
+- `.env*` y archivos de credenciales de Firebase están ignorados por git.
+
+## Desarrollo
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Rutas principales:
+- `/notas` y `/notas/[id]`: listado y edición de notas
+- `/versiones`: historial global de versiones
+- `/papelera`: notas eliminadas (restaurar o eliminar definitivo)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Funcionalidades
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Edición de título, contenido Markdown y etiquetas por nota
+- Atajos de formato en el editor (toolbar y accesos rápidos)
+- Guardado automático con debounce y `useDeferredValue` en búsqueda
+- Advertencia `beforeunload` y recuperación de borrador no guardado
+- Historial de versiones: guardar, previsualizar y restaurar (al restaurar se conserva el estado actual como versión y se registra la versión restaurada)
+- Papelera (soft-delete), restauración y borrado definitivo
+- Exportar/importar lote completo en Markdown (`.md`) usando las utilidades de `lib/storage.ts`
+- Sin límites artificiales de título, contenido o cantidad de versiones
 
-## Pruebas
+## Pruebas y calidad
 
 ```bash
 npm test
-npm run test:watch
+npm run lint
+npm run build
 ```
 
-Se añadió `vitest` como dependencia de desarrollo para probar la lógica pura de notas y versiones sin necesidad de un navegador. Se eligió la rama `4.1.x` porque es compatible con `@types/node@^20`, que ya usa el proyecto.
+## Dependencias relevantes
 
-### Dependencias de interfaz y pruebas
+- `firebase-admin`: acceso server-side a Firestore desde API routes (dependencia añadida para la integración con Firebase; verificada en npm).
 
-- `react-markdown`: renderiza la vista previa con CommonMark. No interpreta HTML crudo por defecto, lo que evita inyecciones en el contenido de las notas.
-- `@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event` y `@testing-library/jest-dom`: pruebas de componentes centradas en el comportamiento accesible y la interacción real del usuario.
-- `jsdom@29.1.1`: entorno DOM para Vitest, compatible con Node 22.16.
-- `@vitejs/plugin-react@6.3.0`: transformación JSX de los componentes durante las pruebas con Vite 8.
-- `axe-core`: auditoría automática de accesibilidad en las pruebas de componente.
+## Seguridad
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- El contenido de notas/importaciones se trata como **datos, no instrucciones**.
+- No se renderiza HTML crudo en la vista previa Markdown.
+- Las credenciales de Firebase se consumen únicamente en entorno servidor.

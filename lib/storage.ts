@@ -78,13 +78,16 @@ function isNote(value: unknown): value is Note {
     return false;
   }
 
+  const deletedAtOk = value.deletedAt === undefined || value.deletedAt === null || typeof value.deletedAt === "string";
+
   return (
     typeof value.id === "string" &&
     typeof value.title === "string" &&
     typeof value.content === "string" &&
     typeof value.updatedAt === "string" &&
     isStringArray(value.tags) &&
-    isNoteVersionArray(value.versions)
+    isNoteVersionArray(value.versions) &&
+    deletedAtOk
   );
 }
 
@@ -94,6 +97,7 @@ function toNoteMetadata(note: Note): NoteMetadata {
     title: note.title,
     tags: [...note.tags],
     updatedAt: note.updatedAt,
+    deletedAt: note.deletedAt ?? null,
     versions: note.versions.map((version) => ({
       timestamp: version.timestamp,
       content: version.content,

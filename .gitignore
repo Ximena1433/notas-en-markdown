@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+notas-markdown-firebase.json
+.notas-markdown-firebase.json
+dev-server.log

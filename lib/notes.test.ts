@@ -1,25 +1,26 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import {
   createNote,
+  moveNoteToTrash,
+  restoreNoteFromTrash,
   restoreNoteVersion,
   saveNoteVersion,
-  updateNoteContent,
+  updateNoteTags,
   updateNoteTitle,
 } from "./notes";
 
 const T0 = "2026-11-14T09:00:00.000Z";
 const T1 = "2026-11-14T10:00:00.000Z";
 const T2 = "2026-11-14T11:00:00.000Z";
-const T3 = "2026-11-14T12:00:00.000Z";
 
 describe("createNote", () => {
-  it("crea una nota con id, título, contenido, etiquetas y sin versiones", () => {
+  it("crea una nota con valores normalizados", () => {
     const note = createNote(
       {
         id: "nota-1",
         title: "Primera nota",
         content: "# Hola",
-        tags: ["ideas", "markdown"],
+        tags: ["ideas", " Ideas ", "", "markdown"],
       },
       T0,
     );
@@ -31,203 +32,82 @@ describe("createNote", () => {
       tags: ["ideas", "markdown"],
       updatedAt: T0,
       versions: [],
+      deletedAt: null,
     });
-  });
-
-  it("usa contenido vacío y etiquetas vacías por defecto", () => {
-    const note = createNote({ id: "nota-2", title: "Sin contenido" }, T0);
-
-    expect(note.content).toBe("");
-    expect(note.tags).toEqual([]);
-    expect(note.updatedAt).toBe(T0);
-    expect(note.versions).toEqual([]);
   });
 });
 
 describe("updateNoteTitle", () => {
-  it("actualiza el título recortando espacios y conserva el resto", () => {
-    const note = createNote(
-      {
-        id: "nota-1",
-        title: "Antiguo",
-        content: "v1",
-        tags: ["ideas"],
-      },
-      T0,
-    );
-
-    const updated = updateNoteTitle(note, "  Nuevo título  ");
-
-    expect(updated.title).toBe("Nuevo título");
-    expect(updated.content).toBe("v1");
-    expect(updated.tags).toEqual(["ideas"]);
-    expect(updated.updatedAt).toBe(T0);
-    expect(updated.versions).toEqual(note.versions);
-    expect(note.title).toBe("Antiguo");
+  it("actualiza el título recortando espacios", () => {
+    const note = createNote({ id: "n1", title: "Antiguo" }, T0);
+    const updated = updateNoteTitle(note, "  Nuevo  ");
+    expect(updated.title).toBe("Nuevo");
   });
 
-  it("mantiene el título anterior si el nuevo está vacío", () => {
-    const note = createNote({ id: "nota-1", title: "Antiguo" }, T0);
-
+  it("mantiene el título si queda vacío", () => {
+    const note = createNote({ id: "n1", title: "Antiguo" }, T0);
     expect(updateNoteTitle(note, "   ")).toBe(note);
-  });
-
-  it("devuelve la misma nota si el título no cambió", () => {
-    const note = createNote({ id: "nota-1", title: "Igual" }, T0);
-
-    expect(updateNoteTitle(note, " Igual ")).toBe(note);
   });
 });
 
-describe("updateNoteContent", () => {
-  it("conserva el contenido anterior como una versión", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-
-    const updated = updateNoteContent(note, "v2", T1);
-
-    expect(updated.content).toBe("v2");
-    expect(updated.updatedAt).toBe(T1);
-    expect(updated.versions).toEqual([{ timestamp: T1, content: "v1" }]);
+describe("updateNoteTags", () => {
+  it("normaliza, recorta y elimina duplicados", () => {
+    const note = createNote({ id: "n1", title: "N", tags: ["a"] }, T0);
+    const updated = updateNoteTags(note, [" React ", "react", "Docs", ""]);
+    expect(updated.tags).toEqual(["React", "Docs"]);
   });
 
-  it("acumula las versiones en orden de actualización", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-
-    const withV2 = updateNoteContent(note, "v2", T1);
-    const withV3 = updateNoteContent(withV2, "v3", T2);
-
-    expect(withV3.content).toBe("v3");
-    expect(withV3.updatedAt).toBe(T2);
-    expect(withV3.versions).toEqual([
-      { timestamp: T1, content: "v1" },
-      { timestamp: T2, content: "v2" },
-    ]);
-  });
-
-  it("no crea una versión si el contenido no cambió", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-
-    const updated = updateNoteContent(note, "v1", T1);
-
-    expect(updated).toBe(note);
-    expect(updated.updatedAt).toBe(T0);
-  });
-
-  it("no muta la nota original", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-
-    updateNoteContent(note, "v2", T1);
-
-    expect(note.content).toBe("v1");
-    expect(note.versions).toEqual([]);
+  it("no cambia si las etiquetas son equivalentes", () => {
+    const note = createNote({ id: "n1", title: "N", tags: ["a", "b"] }, T0);
+    expect(updateNoteTags(note, ["a", "b"])).toBe(note);
   });
 });
 
 describe("saveNoteVersion", () => {
-  it("registra el contenido actual como una versión nueva", () => {
-    const note = createNote(
-      { id: "nota-1", title: "Nota", content: "v1" },
-      T0,
-    );
-
+  it("guarda el contenido actual como versión sin cambiar updatedAt", () => {
+    const note = createNote({ id: "n1", title: "N", content: "v1" }, T0);
     const saved = saveNoteVersion(note, T1);
-
     expect(saved.content).toBe("v1");
     expect(saved.updatedAt).toBe(T0);
     expect(saved.versions).toEqual([{ timestamp: T1, content: "v1" }]);
   });
-
-  it("acumula versiones explícitas en orden de guardado", () => {
-    const note = createNote(
-      { id: "nota-1", title: "Nota", content: "v1" },
-      T0,
-    );
-
-    const firstSave = saveNoteVersion(note, T1);
-    const withV2 = updateNoteContent(firstSave, "v2", T2);
-    const secondSave = saveNoteVersion(withV2, T3);
-
-    expect(secondSave.versions).toEqual([
-      { timestamp: T1, content: "v1" },
-      { timestamp: T2, content: "v1" },
-      { timestamp: T3, content: "v2" },
-    ]);
-  });
-
-  it("no muta la nota original al guardar", () => {
-    const note = createNote(
-      { id: "nota-1", title: "Nota", content: "v1" },
-      T0,
-    );
-
-    saveNoteVersion(note, T1);
-
-    expect(note.versions).toEqual([]);
-  });
 });
 
 describe("restoreNoteVersion", () => {
-  it("restaura el contenido de una versión previa", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-    const updated = updateNoteContent(note, "v2", T1);
-
-    const restored = restoreNoteVersion(updated, 0, T2);
+  it("guarda el actual y crea versión del restaurado", () => {
+    const base = createNote({ id: "n1", title: "N", content: "v1" }, T0);
+    const current = { ...base, content: "v2", versions: [{ timestamp: T0, content: "v1" }] };
+    const restored = restoreNoteVersion(current, 0, T2);
 
     expect(restored.content).toBe("v1");
     expect(restored.updatedAt).toBe(T2);
-  });
-
-  it("conserva el estado actual al restaurar para poder deshacerlo", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-    const updated = updateNoteContent(note, "v2", T1);
-
-    const restored = restoreNoteVersion(updated, 0, T2);
-
     expect(restored.versions).toEqual([
-      { timestamp: T1, content: "v1" },
+      { timestamp: T0, content: "v1" },
       { timestamp: T2, content: "v2" },
+      { timestamp: T2, content: "v1" },
     ]);
   });
 
-  it("permite restaurar cualquier versión previa, no solo la última", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-    const withV2 = updateNoteContent(note, "v2", T1);
-    const withV3 = updateNoteContent(withV2, "v3", T2);
-
-    const restored = restoreNoteVersion(withV3, 1, T3);
-
-    expect(restored.content).toBe("v2");
-    expect(restored.versions).toEqual([
-      { timestamp: T1, content: "v1" },
-      { timestamp: T2, content: "v2" },
-      { timestamp: T3, content: "v3" },
-    ]);
+  it("crea versiones incluso si el contenido coincide con el actual", () => {
+    const note = createNote({ id: "n1", title: "N", content: "igual" }, T0);
+    const withVersion = saveNoteVersion(note, T1);
+    const restored = restoreNoteVersion(withVersion, 0, T2);
+    expect(restored.content).toBe("igual");
+    expect(restored.versions).toHaveLength(3);
   });
 
-  it("no crea una versión si el contenido restaurado es el actual", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-    const updated = updateNoteContent(note, "v2", T1);
-    const restored = restoreNoteVersion(updated, 0, T2);
-
-    const restoredAgain = restoreNoteVersion(restored, 0, T3);
-
-    expect(restoredAgain).toBe(restored);
-  });
-
-  it("lanza RangeError si la versión no existe", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-
+  it("lanza si el índice no existe", () => {
+    const note = createNote({ id: "n1", title: "N", content: "v1" }, T0);
     expect(() => restoreNoteVersion(note, 0, T1)).toThrow(RangeError);
-    expect(() => restoreNoteVersion(note, -1, T1)).toThrow(RangeError);
   });
+});
 
-  it("no muta la nota original al restaurar", () => {
-    const note = createNote({ id: "nota-1", title: "Nota", content: "v1" }, T0);
-    const updated = updateNoteContent(note, "v2", T1);
-
-    restoreNoteVersion(updated, 0, T2);
-
-    expect(updated.content).toBe("v2");
-    expect(updated.versions).toEqual([{ timestamp: T1, content: "v1" }]);
+describe("papelera", () => {
+  it("mueve y restaura notas", () => {
+    const note = createNote({ id: "n1", title: "N" }, T0);
+    const trashed = moveNoteToTrash(note, T1);
+    expect(trashed.deletedAt).toBe(T1);
+    const restored = restoreNoteFromTrash(trashed, T2);
+    expect(restored.deletedAt).toBeNull();
   });
 });

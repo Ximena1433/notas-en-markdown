@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useId } from "react";
+import { useDeferredValue, useId } from "react";
 import type { Note } from "../lib/notes";
 import { searchNotes } from "../lib/search";
 
@@ -25,6 +25,8 @@ export interface NotesPanelProps {
   onToggleTag: (tag: string) => void;
   onSelectNote: (noteId: string) => void;
   onCreateNote: () => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
 }
 
 export default function NotesPanel({
@@ -39,13 +41,17 @@ export default function NotesPanel({
   onToggleTag,
   onSelectNote,
   onCreateNote,
+  onExport,
+  onImport,
 }: NotesPanelProps) {
   const id = useId();
   const headingId = `${id}-heading`;
   const searchId = `${id}-search`;
+  const importId = `${id}-import`;
   const tagsLabelId = `${id}-tags-label`;
+  const deferredQuery = useDeferredValue(query);
   const visibleNotes = searchNotes(notes, {
-    text: query,
+    text: deferredQuery,
     tags: [...selectedTags],
   });
   const availableTags = Array.from(
@@ -62,30 +68,42 @@ export default function NotesPanel({
         isVisible ? "block" : "hidden lg:block"
       }`}
     >
-      <h2
-        id={headingId}
-        className="text-base font-semibold text-zinc-950 dark:text-zinc-50"
-      >
+      <h2 id={headingId} className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
         Notas
       </h2>
 
-      <button
-        type="button"
-        onClick={onCreateNote}
-        className={`mt-3 ${CREATE_BUTTON}`}
-      >
-        Nueva nota
-      </button>
-
-      <form
-        role="search"
-        onSubmit={(event) => event.preventDefault()}
-        className="mt-3"
-      >
-        <label
-          htmlFor={searchId}
-          className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <button type="button" onClick={onCreateNote} className={CREATE_BUTTON}>
+          Nueva nota
+        </button>
+        <button
+          type="button"
+          onClick={onExport}
+          className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800 ${FOCUS_RING}`}
         >
+          Exportar
+        </button>
+        <label
+          htmlFor={importId}
+          className={`inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800 ${FOCUS_RING}`}
+        >
+          Importar
+          <input
+            id={importId}
+            type="file"
+            accept=".md,text/markdown"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onImport(file);
+              e.currentTarget.value = "";
+            }}
+          />
+        </label>
+      </div>
+
+      <form role="search" onSubmit={(event) => event.preventDefault()} className="mt-3">
+        <label htmlFor={searchId} className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
           Buscar notas
         </label>
         <input
@@ -93,23 +111,19 @@ export default function NotesPanel({
           type="search"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Título o contenido..."
+          placeholder="Titulo o contenido..."
           className={`mt-1 h-11 w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 placeholder:text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 dark:placeholder:text-zinc-400 ${FOCUS_RING}`}
         />
       </form>
 
       {availableTags.length > 0 ? (
         <div role="group" aria-labelledby={tagsLabelId} className="mt-3">
-          <p
-            id={tagsLabelId}
-            className="text-sm font-semibold text-zinc-900 dark:text-zinc-100"
-          >
+          <p id={tagsLabelId} className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
             Filtrar por etiquetas
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {availableTags.map((tag) => {
               const isSelected = selectedTags.includes(tag);
-
               return (
                 <button
                   key={tag}
@@ -134,17 +148,12 @@ export default function NotesPanel({
         <h3 className="sr-only">Resultados</h3>
         {visibleNotes.length === 0 ? (
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            No hay notas que coincidan con la búsqueda.
+            No hay notas que coincidan con la busqueda.
           </p>
         ) : (
-          <ul
-            data-testid="note-list"
-            aria-labelledby={headingId}
-            className="space-y-2"
-          >
+          <ul data-testid="note-list" aria-labelledby={headingId} className="space-y-2">
             {visibleNotes.map((note) => {
               const isActive = note.id === activeNoteId;
-
               return (
                 <li key={note.id} className="min-w-0">
                   <button
@@ -161,9 +170,7 @@ export default function NotesPanel({
                       {note.title}
                     </span>
                     <span className="mt-1 block break-words text-xs text-zinc-700 dark:text-zinc-300">
-                      {note.tags.length > 0
-                        ? note.tags.join(" · ")
-                        : "Sin etiquetas"}
+                      {note.tags.length > 0 ? note.tags.join(", ") : "Sin etiquetas"}
                     </span>
                   </button>
                 </li>

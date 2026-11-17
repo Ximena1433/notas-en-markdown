@@ -3,6 +3,8 @@ import type { Note } from "./notes";
 export interface NoteSearchFilters {
   text?: string;
   tags?: string[];
+  includeTrashed?: boolean;
+  onlyTrashed?: boolean;
 }
 
 function normalize(value: string): string {
@@ -44,8 +46,20 @@ export function searchNotes(
 ): Note[] {
   const query = normalize(filters.text ?? "");
   const selectedTags = normalizeTags(filters.tags ?? []);
+  const onlyTrashed = filters.onlyTrashed ?? false;
+  const includeTrashed = filters.includeTrashed ?? false;
 
   return notes
+    .filter((note) => {
+      const trashed = Boolean(note.deletedAt);
+      if (onlyTrashed) {
+        return trashed;
+      }
+      if (!includeTrashed && trashed) {
+        return false;
+      }
+      return true;
+    })
     .filter(
       (note) => matchesText(note, query) && matchesAllTags(note, selectedTags),
     )
