@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { readJsonBody, requireApiUser } from "@/lib/auth/http";
 import {
   badRequest,
   deleteNote,
@@ -17,10 +18,12 @@ import {
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
+  const auth = await requireApiUser(req);
+  if (!auth.ok) return auth.response;
   try {
     const { id } = await ctx.params;
-    const note = await getNote(id);
+    const note = await getNote(id, auth.user.id);
     if (!note) return notFound();
     return ok(note);
   } catch {
@@ -29,13 +32,14 @@ export async function GET(_req: Request, ctx: Ctx) {
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
+  const auth = await requireApiUser(req);
+  if (!auth.ok) return auth.response;
   try {
     const { id } = await ctx.params;
-    const note = await getNote(id);
+    const note = await getNote(id, auth.user.id);
     if (!note) return notFound();
-    const body = (await req.json()) as unknown;
-    if (typeof body !== "object" || body === null) return badRequest("Solicitud inválida");
-    const b = body as Record<string, unknown>;
+    const b = await readJsonBody(req);
+    if (b === null) return badRequest("Solicitud inválida");
     let updated = note;
 
     if (b.action === "trash") {
@@ -63,17 +67,19 @@ export async function PATCH(req: Request, ctx: Ctx) {
       }
     }
 
-    await putNote(updated);
+    await putNote(updated, auth.user.id);
     return ok(updated);
   } catch {
     return NextResponse.json({ error: "Error al actualizar nota" }, { status: 500 });
   }
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+export async function DELETE(req: Request, ctx: Ctx) {
+  const auth = await requireApiUser(req);
+  if (!auth.ok) return auth.response;
   try {
     const { id } = await ctx.params;
-    await deleteNote(id);
+    await deleteNote(id, auth.user.id);
     return ok({ deleted: true });
   } catch {
     return NextResponse.json({ error: "Error al eliminar nota" }, { status: 500 });

@@ -59,7 +59,7 @@ export function createNote(input: CreateNoteInput, timestamp: string): Note {
   };
 }
 
-export function updateNoteTitle(note: Note, title: string): Note {
+export function updateNoteTitle<T extends Note>(note: T, title: string): T {
   const normalized = title.trim();
   if (normalized === "" || normalized === note.title) {
     return note;
@@ -67,7 +67,7 @@ export function updateNoteTitle(note: Note, title: string): Note {
   return { ...note, title: normalized };
 }
 
-export function updateNoteTags(note: Note, tags: readonly string[]): Note {
+export function updateNoteTags<T extends Note>(note: T, tags: readonly string[]): T {
   const nextTags = normalizeTags(tags);
   if (
     nextTags.length === note.tags.length &&
@@ -78,18 +78,18 @@ export function updateNoteTags(note: Note, tags: readonly string[]): Note {
   return { ...note, tags: nextTags };
 }
 
-export function saveNoteVersion(note: Note, timestamp: string): Note {
+export function saveNoteVersion<T extends Note>(note: T, timestamp: string): T {
   return {
     ...note,
     versions: [...note.versions, { timestamp, content: note.content }],
   };
 }
 
-export function restoreNoteVersion(
-  note: Note,
+export function restoreNoteVersion<T extends Note>(
+  note: T,
   versionIndex: number,
   timestamp: string,
-): Note {
+): T {
   const version = note.versions[versionIndex];
   if (version === undefined) {
     throw new RangeError(`La versión ${versionIndex} no existe`);
@@ -107,14 +107,14 @@ export function restoreNoteVersion(
   };
 }
 
-export function moveNoteToTrash(note: Note, timestamp: string): Note {
+export function moveNoteToTrash<T extends Note>(note: T, timestamp: string): T {
   if (note.deletedAt) {
     return note;
   }
   return { ...note, deletedAt: timestamp, updatedAt: timestamp };
 }
 
-export function restoreNoteFromTrash(note: Note, timestamp: string): Note {
+export function restoreNoteFromTrash<T extends Note>(note: T, timestamp: string): T {
   if (!note.deletedAt) {
     return note;
   }

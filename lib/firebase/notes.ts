@@ -1,10 +1,11 @@
 ﻿import type { Note, NoteVersion } from "../notes";
 
-export type NoteRecord = Note & { deletedAt: string | null };
+export type NoteRecord = Note & { deletedAt: string | null; ownerId: string };
 
-export function toRecord(note: Note): NoteRecord {
+export function toRecord(note: Note, ownerId: string): NoteRecord {
   return {
     id: note.id,
+    ownerId,
     title: note.title,
     content: note.content,
     tags: [...note.tags],
@@ -27,6 +28,7 @@ export function fromRecord(data: unknown): NoteRecord | null {
     typeof r.title !== "string" ||
     typeof r.content !== "string" ||
     typeof r.updatedAt !== "string" ||
+    typeof r.ownerId !== "string" ||
     !Array.isArray(r.tags) ||
     !Array.isArray(r.versions)
   ) {
@@ -58,6 +60,7 @@ export function fromRecord(data: unknown): NoteRecord | null {
     content: r.content,
     tags,
     updatedAt: r.updatedAt,
+    ownerId: r.ownerId,
     deletedAt,
     versions,
   };

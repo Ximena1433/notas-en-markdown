@@ -9,6 +9,7 @@ import {
   saveNoteVersion,
   updateNoteTags,
   updateNoteTitle,
+  createNoteId,
   type Note,
 } from "@/lib/notes";
 import { notesFromMarkdown, notesToMarkdown } from "@/lib/storage";
@@ -17,27 +18,36 @@ function now(): string {
   return new Date().toISOString();
 }
 
-export async function listNotes(): Promise<NoteRecord[]> {
-  const snap = await getDb().collection(NOTES_COLLECTION).get();
+export async function listNotes(ownerId: string): Promise<NoteRecord[]> {
+  const snap = await getDb().collection(NOTES_COLLECTION).where("ownerId", "==", ownerId).get();
   const notes: NoteRecord[] = [];
   for (const doc of snap.docs) {
     const rec = fromRecord(doc.data());
-    if (rec) notes.push(rec);
+    if (rec && rec.ownerId === ownerId) notes.push(rec);
   }
   return notes;
 }
 
-export async function getNote(id: string): Promise<NoteRecord | null> {
+export async function getNote(id: string, ownerId: string): Promise<NoteRecord | null> {
   const doc = await getDb().collection(NOTES_COLLECTION).doc(id).get();
   if (!doc.exists) return null;
-  return fromRecord(doc.data());
+  const rec = fromRecord(doc.data());
+  return rec && rec.ownerId === ownerId ? rec : null;
 }
 
-export async function putNote(note: Note): Promise<void> {
-  await getDb().collection(NOTES_COLLECTION).doc(note.id).set(toRecord(note));
+export async function putNote(note: Note, ownerId: string): Promise<void> {
+  await getDb().collection(NOTES_COLLECTION).doc(note.id).set(toRecord(note, ownerId));
 }
 
-export async function deleteNote(id: string): Promise<void> {
+export async function putNewNote(note: Note, ownerId: string): Promise<Note> {
+  const created: Note = { ...note, id: createNoteId() };
+  await putNote(created, ownerId);
+  return created;
+}
+
+export async function deleteNote(id: string, ownerId: string): Promise<void> {
+  const note = await getNote(id, ownerId);
+  if (note === null) return;
   await getDb().collection(NOTES_COLLECTION).doc(id).delete();
 }
 

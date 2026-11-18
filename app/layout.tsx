@@ -1,6 +1,8 @@
-﻿import type { Metadata } from "next";
+﻿import { Suspense } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import SessionMenu from "@/components/SessionMenu";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,6 +42,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/papelera" className="text-sm font-semibold hover:underline">
               Papelera
             </Link>
+            <div className="ml-auto">
+              <Suspense fallback={<span className="text-sm text-zinc-500 dark:text-zinc-400">Sesión...</span>}>
+                <SessionMenu />
+              </Suspense>
+            </div>
           </div>
         </nav>
         <div className="flex-1">{children}</div>

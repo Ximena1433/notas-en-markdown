@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Note } from "./notes";
 
 export const DRAFT_KEY = "notas-en-markdown:draft:v1";
@@ -49,11 +50,21 @@ function writeDraft(draft: DraftState | null) {
   }
 }
 
+class UnauthorizedError extends Error {
+  constructor() {
+    super("api_unauthorized");
+    this.name = "UnauthorizedError";
+  }
+}
+
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
+  if (res.status === 401) {
+    throw new UnauthorizedError();
+  }
   if (!res.ok) {
     throw new Error("api_error");
   }
@@ -79,6 +90,7 @@ export interface UseNotesResult {
 }
 
 export function useNotesState(): UseNotesResult {
+  const router = useRouter();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +99,24 @@ export function useNotesState(): UseNotesResult {
 
   const markDirty = useCallback(() => setDirty(true), []);
   const markClean = useCallback(() => setDirty(false), []);
+
+  const redirectToLogin = useCallback(() => {
+    const next = `${window.location.pathname}${window.location.search}`;
+    router.replace(`/login?next=${encodeURIComponent(next)}`);
+    router.refresh();
+  }, [router]);
+
+  const callApi = useCallback(
+    async <T,>(work: () => Promise<T>): Promise<T> => {
+      try {
+        return await work();
+      } catch (error) {
+        if (error instanceof UnauthorizedError) redirectToLogin();
+        throw error;
+      }
+    },
+    [redirectToLogin],
+  );
 
   useEffect(() => {
     if (!dirty) return;
@@ -110,7 +140,7 @@ export function useNotesState(): UseNotesResult {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await api<Note[]>("/api/notes");
+      const data = await callApi(() => api<Note[]>("/api/notes"));
       setNotes(data);
       setError(null);
     } catch {
@@ -118,13 +148,13 @@ export function useNotesState(): UseNotesResult {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [callApi]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const data = await api<Note[]>("/api/notes");
+        const data = await callApi(() => api<Note[]>("/api/notes"));
         if (!cancelled) {
           setNotes(data);
           setError(null);
@@ -138,51 +168,51 @@ export function useNotesState(): UseNotesResult {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [callApi]);
 
   const createNote = useCallback(async (input?: { title?: string; content?: string; tags?: string[] }) => {
     try {
-      const note = await api<Note>("/api/notes", { method: "POST", body: JSON.stringify(input ?? {}) });
+      const note = await callApi(() => api<Note>("/api/notes", { method: "POST", body: JSON.stringify(input ?? {}) }));
       setNotes((prev) => [note, ...prev]);
       return note;
     } catch {
       setError("No se pudo crear la nota.");
       return null;
     }
-  }, []);
+  }, [callApi]);
 
   const patchNote = useCallback(async (id: string, patch: Record<string, unknown>) => {
     try {
-      const note = await api<Note>(`/api/notes/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
+      const note = await callApi(() => api<Note>(`/api/notes/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) }));
       setNotes((prev) => prev.map((n) => (n.id === id ? note : n)));
       return note;
     } catch {
       setError("No se pudo guardar la nota.");
       return null;
     }
-  }, []);
+  }, [callApi]);
 
   const deleteNotePermanent = useCallback(async (id: string) => {
     try {
-      await api(`/api/notes/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await callApi(() => api(`/api/notes/${encodeURIComponent(id)}`, { method: "DELETE" }));
       setNotes((prev) => prev.filter((n) => n.id !== id));
       return true;
     } catch {
       setError("No se pudo eliminar la nota.");
       return false;
     }
-  }, []);
+  }, [callApi]);
 
   const importMarkdown = useCallback(async (markdown: string) => {
-    const res = await api<{ imported: number }>("/api/notes", { method: "POST", body: JSON.stringify({ action: "import", markdown }) });
+    const res = await callApi(() => api<{ imported: number }>("/api/notes", { method: "POST", body: JSON.stringify({ action: "import", markdown }) }));
     await refresh();
     return res.imported;
-  }, [refresh]);
+  }, [callApi, refresh]);
 
   const exportMarkdown = useCallback(async () => {
-    const res = await api<{ markdown: string }>("/api/notes", { method: "POST", body: JSON.stringify({ action: "export" }) });
+    const res = await callApi(() => api<{ markdown: string }>("/api/notes", { method: "POST", body: JSON.stringify({ action: "export" }) }));
     return res.markdown;
-  }, []);
+  }, [callApi]);
 
   return useMemo(() => ({
     notes,
